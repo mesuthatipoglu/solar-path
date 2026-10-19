@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>COSMOS 3D — Galaktik & Güneş Sistemi Uzay Simülatörü</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Orbitron:wght@500;700;800;900&display=swap" rel="stylesheet">
+    <!-- Application Styles -->
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div id="game-container">
+        <!-- 3D WebGL Canvas -->
+        <canvas id="space-canvas"></canvas>
+
+        <!-- 3D On-screen Target Reticle Marker -->
+        <div id="target-marker" data-label="Hedef"></div>
+
+        <!-- Center Cockpit Reticle -->
+        <div class="cockpit-center">
+            <div class="reticle-ring">
+                <div class="reticle-dot"></div>
+            </div>
+        </div>
+        <div id="pointer-lock-hint">360° Serbest Bakış: Fareyle Sürükleyin veya Ekrana Çift Tıklayın • C: Kamera Açısı (3. Şahıs)</div>
+
+        <!-- ==================== MAIN MENU OVERLAY ==================== -->
+        <div id="main-menu" class="interactive">
+            <div class="menu-header">
+                <div class="menu-badge">3 Boyutlu Uzay &amp; Galaksi Keşif Motoru</div>
+                <h1 class="menu-title">COSMOS ODYSSEY 3D</h1>
+                <p class="menu-subtitle">
+                    Güneş Sistemimizden komşu yıldız sistemlerine ve uzak galaksilere kadar 360° serbest uçuşla keşfe çıkın.
+                    Gezegenlere yaklaştıkça yüzey kraterleri, bulut katmanları ve atmosfer detayları dinamik olarak artar.
+                </p>
+            </div>
+
+            <div class="menu-content-grid">
+                <!-- Left Card: Quick Start System Selector -->
+                <div class="menu-card">
+                    <h3><span>🌌</span> Başlangıç Galaksisi &amp; Yıldız Sistemi Seçin</h3>
+                    <div id="menu-system-list" class="galaxy-start-list">
+                        <!-- Populated dynamically by js/app.js -->
+                    </div>
+                </div>
+
+                <!-- Right Card: 360° Flight Controls & Calibration Info -->
+                <div class="menu-card">
+                    <h3><span>🚀</span> 360° Uçuş Kontrolleri &amp; Seyir Kalibrasyonu</h3>
+                    <div class="controls-summary">
+                        <div class="ctrl-row">
+                            <span>İleri / Geri İtki</span>
+                            <span class="key-pill">W / S</span>
+                        </div>
+                        <div class="ctrl-row">
+                            <span>Yanal Kayma (Sol / Sağ)</span>
+                            <span class="key-pill">A / D</span>
+                        </div>
+                        <div class="ctrl-row">
+                            <span>360° Yatış (Roll Döndürme)</span>
+                            <span class="key-pill">Q / E</span>
+                        </div>
+                        <div class="ctrl-row">
+                            <span>Dikey Yükseliş / Alçalış</span>
+                            <span class="key-pill">SPACE / CTRL</span>
+                        </div>
+                        <div class="ctrl-row">
+                            <span>360° Serbest Bakış</span>
+                            <span class="key-pill">FARE / ÇİFT TIK</span>
+                        </div>
+                        <div class="ctrl-row">
+                            <span>Anlık Turbo İtki</span>
+                            <span class="key-pill">SHIFT</span>
+                        </div>
+                        <div class="ctrl-row">
+                            <span>Hassas Hız Ayarı</span>
+                            <span class="key-pill">FARE TEKERLEĞİ</span>
+                        </div>
+                        <div class="ctrl-row">
+                            <span>Kamera Açısı (3. Şahıs / Kokpit)</span>
+                            <span class="key-pill">C</span>
+                        </div>
+                        <div class="ctrl-row">
+                            <span>Galaksi Haritası / Yörüngeler</span>
+                            <span class="key-pill">M / O</span>
+                        </div>
+                    </div>
+                    <div style="font-size: calc(12px * var(--ui-scale)); color: var(--text-muted); line-height: 1.45; margin-top: auto; background: rgba(0, 229, 255, 0.06); padding: 10px; border-radius: 8px; border: 1px solid rgba(0,229,255,0.2);">
+                        <strong style="color: var(--primary);">🛰️ 3. Şahıs Yüksek Takip Kamerası:</strong><br>
+                        Gezegenleri yatay hizada kaybetmemeniz için kamera uzay geminizi <strong>yukarıdan ve belirli bir mesafeden</strong> 3. kişi gözüyle takip eder. Dilerseniz <strong>C</strong> tuşuyla kamera mesafesini veya kokpit modunu değiştirebilirsiniz.
+                    </div>
+                </div>
+            </div>
+
+            <div class="menu-actions">
+                <button id="btn-launch" class="launch-btn">Uzay Gemisine Geç &amp; Uçuşu Başlat</button>
+            </div>
+
+            <div class="menu-footer">
+                <div>WebGL Three.js 3D Fizik &amp; Prosedürel + NASA/Wikimedia Gezegen Dokuları</div>
+                <div id="app-version-display" class="version-tag">v1.1.0 - 2026-10-19 23:15</div>
+            </div>
+        </div>
+
+        <!-- ==================== IN-GAME COCKPIT HUD ==================== -->
+        <div class="ui-layer">
+            <!-- TOP HUD -->
+            <div class="hud-top">
+                <div class="hud-panel location-panel interactive">
+                    <div id="hud-galaxy-name" class="loc-galaxy">Samanyolu Galaksisi</div>
+                    <div id="hud-system-name" class="loc-system">Güneş Sistemi (Sol)</div>
+                    <div id="hud-coords" class="loc-coords">X: 0.0k  Y: 0.0k  Z: 0.0k</div>
+                </div>
+
+                <div class="hud-panel compass-panel">
+                    <div class="compass-bar">
+                        <span id="hud-heading" class="compass-readout">YÖN (YAW): 000°</span>
+                    </div>
+                    <div class="attitude-angles">
+                        <span id="hud-pitch">EĞİM (PITCH): 0°</span>
+                        <span id="hud-roll">YATIŞ (ROLL): 0°</span>
+                    </div>
+                </div>
+
+                <div class="hud-actions interactive">
+                    <button id="btn-toggle-camera" class="hud-btn">🎥 Kamera: 3. Şahıs (C)</button>
+                    <button id="btn-open-galaxy-map" class="hud-btn">🌌 Galaksi &amp; Sistemler (M)</button>
+                    <button id="btn-toggle-orbits" class="hud-btn active">🪐 Yörünge Çizgileri (O)</button>
+                    <button id="btn-open-menu" class="hud-btn">⚙️ Ana Menü</button>
+                </div>
+            </div>
+
+            <!-- MIDDLE HUD (LEFT: SYSTEM BODIES, RIGHT: TARGET TELEMETRY & LOD) -->
+            <div class="hud-middle">
+                <div class="hud-panel nav-sidebar interactive">
+                    <div class="sidebar-header">
+                        <span>SİSTEM GÖK CİSİMLERİ</span>
+                        <span>MESAFE</span>
+                    </div>
+                    <div id="hud-body-list" class="body-list">
+                        <!-- Populated dynamically -->
+                    </div>
+                </div>
+
+                <div class="hud-panel inspector-sidebar interactive">
+                    <div class="target-title-row">
+                        <div id="target-name" class="target-name">Dünya (Terra)</div>
+                        <span id="target-type" class="target-badge">Karasal Gezegen</span>
+                    </div>
+                    <p id="target-desc" class="target-desc">
+                        Gezegen açıklaması yükleniyor...
+                    </p>
+
+                    <div class="telemetry-grid">
+                        <div class="stat-box">
+                            <div class="stat-label">Anlık Mesafe</div>
+                            <div id="target-live-dist" class="stat-val">--</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-label">Gerçek Yörünge</div>
+                            <div id="target-real-dist" class="stat-val">1.00 AU</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-label">Yüzey Sıcaklığı</div>
+                            <div id="target-temp" class="stat-val">+15°C</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-label">Yörünge Periyodu</div>
+                            <div id="target-period" class="stat-val">365.25 Gün</div>
+                        </div>
+                    </div>
+
+                    <!-- Progressive Surface Detail (LOD) Indicator -->
+                    <div class="lod-box">
+                        <div class="lod-header">
+                            <span style="color:var(--primary); font-weight:600;">Yüzey &amp; Atmosfer Detayı (LOD)</span>
+                            <span id="lod-percent-val" style="font-family:monospace; color:#00e676;">%85</span>
+                        </div>
+                        <div class="lod-bar-bg">
+                            <div id="lod-bar-fill" class="lod-bar-fill"></div>
+                        </div>
+                    </div>
+
+                    <div class="target-actions">
+                        <button id="btn-autopilot" class="action-btn">Rotaya Uç (Otopilot)</button>
+                        <button id="btn-lock-orbit" class="action-btn secondary">Yörüngeye Kenetlen</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- BOTTOM HUD (FLIGHT SPEED, ~1 MIN CRUISE MODES & ORBIT TIME-SCALE) -->
+            <div class="hud-bottom">
+                <div class="hud-panel flight-dashboard interactive">
+                    <div class="speed-readout">
+                        <span class="speed-label">Uzay Aracı Seyir Hızı</span>
+                        <span id="hud-speed-val" class="speed-value">360 u/sn</span>
+                        <span id="hud-eta-val" class="eta-readout">Hedefe Varış (ETA): ~58 saniye</span>
+                    </div>
+
+                    <div class="drive-modes">
+                        <button class="drive-btn" data-mult="0.2">
+                            <strong>1 • YÖRÜNGE İNCELEME</strong>
+                            <span>0.2x (Yüzey Yakın Uçuş)</span>
+                        </button>
+                        <button class="drive-btn active" data-mult="1.0">
+                            <strong>2 • NORMAL SEYİR (1x)</strong>
+                            <span>~1 Dk Gezegenler Arası</span>
+                        </button>
+                        <button class="drive-btn" data-mult="4.0">
+                            <strong>3 • HIZLI SEYİR (4x)</strong>
+                            <span>~15 Sn Gezegenler Arası</span>
+                        </button>
+                        <button class="drive-btn" data-mult="20.0">
+                            <strong>4 • HİPER-WARP (20x)</strong>
+                            <span>Dış Gezegen Sıçraması</span>
+                        </button>
+                    </div>
+
+                    <div class="orbit-speed-ctrl">
+                        <label for="orbit-speed-slider">
+                            <span>Gezegen Dönüş Hızı</span>
+                            <strong id="orbit-speed-val" style="color:var(--primary);">1.0x</strong>
+                        </label>
+                        <input id="orbit-speed-slider" type="range" min="0" max="5" step="0.2" value="1.0">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== GALAXY & STAR SYSTEM WARP MODAL ==================== -->
+        <div id="galaxy-modal" class="hidden interactive">
+            <div class="modal-window">
+                <div class="modal-header">
+                    <h2>🌌 Evren Haritası: Galaksiler &amp; Bilinen Yıldız Sistemleri</h2>
+                    <button id="btn-close-galaxy-map" class="hud-btn">✕ Kapat (ESC / M)</button>
+                </div>
+                <p style="font-size: calc(13px * var(--ui-scale)); color: var(--text-muted);">
+                    Keşfetmek istediğiniz galaksiyi seçin ve içerisindeki yıldız sistemlerine hiper-uzay sıçraması yapın:
+                </p>
+                <div id="galaxy-tabs-container" class="galaxy-tabs">
+                    <!-- Populated by js/app.js -->
+                </div>
+                <div id="galaxy-systems-grid" class="systems-grid">
+                    <!-- Populated by js/app.js -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Three.js 3D Engine (CDN) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- Application Modules -->
+    <script src="js/data.js"></script>
+    <script src="js/textures.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
