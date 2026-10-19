@@ -47,46 +47,42 @@ class CosmosSimulator {
         // 3rd Person Follow Camera Modes (Default: 3rd person above following the spaceship!)
         this.cameraModes = [
             {
-                id: 'chase_high',
-                name: '3. Şahıs (Yukarıdan Takip)',
-                shortName: '3. Şahıs (Üst)',
-                offset: new THREE.Vector3(0, 22, 58),       // Elevated 22 units above, 58 behind
-                lookAt: new THREE.Vector3(0, 4, -40),       // Looking ahead and slightly down over ship's nose
-                followSpeed: 14.0,
-                isCockpit: false
+                id: 'chase',
+                name: '3. Şahıs (Gemi Takip)',
+                shortName: '3. Şahıs',
+                offset: new THREE.Vector3(0, 16, 48),
+                lookAt: new THREE.Vector3(0, 3, -35),
+                isCockpit: false,
+                isHighSystem: false
             },
             {
-                id: 'chase_far',
-                name: '3. Şahıs (Geniş Açı / Uzak)',
-                shortName: '3. Şahıs (Uzak)',
-                offset: new THREE.Vector3(0, 42, 110),      // High and far back for panoramic planet vistas
-                lookAt: new THREE.Vector3(0, 6, -50),
-                followSpeed: 10.0,
-                isCockpit: false
-            },
-            {
-                id: 'chase_close',
-                name: '3. Şahıs (Yakın Takip)',
-                shortName: '3. Şahıs (Yakın)',
-                offset: new THREE.Vector3(0, 11, 32),       // Closer behind the ship
-                lookAt: new THREE.Vector3(0, 2, -30),
-                followSpeed: 18.0,
-                isCockpit: false
+                id: 'system_high',
+                name: 'Yüksek Bakış (Güneş Sisteminin Yarısı)',
+                shortName: 'Yüksek Sistem',
+                offset: new THREE.Vector3(0, 55000, 28000),
+                lookAt: new THREE.Vector3(0, 0, -8000),
+                isCockpit: false,
+                isHighSystem: true
             },
             {
                 id: 'cockpit',
                 name: '1. Şahıs (Kokpit)',
-                shortName: '1. Şahıs (Kokpit)',
-                offset: new THREE.Vector3(0, 1.2, -3.2),    // Inside/front of cockpit canopy
-                lookAt: new THREE.Vector3(0, 1.2, -80),
-                followSpeed: 25.0,
-                isCockpit: true
+                shortName: '1. Kişi',
+                offset: new THREE.Vector3(0, 0.8, -7.5),
+                lookAt: new THREE.Vector3(0, 0.8, -120),
+                isCockpit: true,
+                isHighSystem: false
             }
         ];
         this.currentCameraModeIndex = 0; // Starts in 3rd Person Elevated Follow
         this.cameraSnapNeeded = true;
         this.lastYawRate = 0;
         this.currentBankRoll = 0;
+
+        // High System Pan & Zoom State (Touch / Mouse drag & pinch for full solar system exploration)
+        this.highSystemPan = new THREE.Vector2(0, 0);
+        this.highSystemAltitude = 75000;
+        this.isHUDHidden = false;
 
         this.calculateGameArea();
         this.initThree();
@@ -389,6 +385,22 @@ class CosmosSimulator {
         this.shipVisual.add(beacon);
         this.navBeacon = beacon;
 
+        // 7. Tactical Hologram Marker Ring for High System View
+        const markerGeo = new THREE.RingGeometry(800, 1400, 32);
+        const markerMat = new THREE.MeshBasicMaterial({
+            color: 0x00f5ff,
+            side: THREE.DoubleSide,
+            transparent: true,
+            opacity: 0.85,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false
+        });
+        const markerMesh = new THREE.Mesh(markerGeo, markerMat);
+        markerMesh.rotation.x = Math.PI * 0.5;
+        markerMesh.visible = false;
+        this.ship.add(markerMesh);
+        this.tacticalMarker = markerMesh;
+
         // Initialize engine particle trail system
         this.initEngineTrails();
 
@@ -490,39 +502,95 @@ class CosmosSimulator {
         if (!this.ship) return;
 
         const currentMode = this.cameraModes[this.currentCameraModeIndex];
-        const offset = currentMode.offset.clone().applyQuaternion(this.ship.quaternion);
-        const targetCamPos = this.ship.position.clone().add(offset);
 
-        const lookOffset = currentMode.lookAt.clone().applyQuaternion(this.ship.quaternion);
-        const targetLookPos = this.ship.position.clone().add(lookOffset);
+        if (currentMode.isHighSystem) {
+            // YÜKSEK SİSTEM BAKIŞI (Güneş Sistemini Gezme & Kaydırarak Tamamını Görme)
+            // Kullanıcı fare veya parmakla kaydırarak (pan) ve tekerlek/pinch ile yakınlaştırıp uzaklaşarak tüm güneş sistemini gezebilir.
+            const targetX = this.ship.position.x + this.highSystemPan.x;
+            const targetZ = this.ship.position.z + this.highSystemPan.y;
+            const altitude = this.highSystemAltitude;
 
-        if (this.cameraSnapNeeded) {
-            this.camera.position.copy(targetCamPos);
+            this.camera.position.set(
+                targetX,
+                this.ship.position.y + altitude,
+                targetZ + altitude * 0.44
+            );
+            this.camera.up.set(0, 1, 0);
+            this.camera.lookAt(
+                targetX,
+                0,
+                targetZ - altitude * 0.12
+            );
+
+            if (this.shipVisual) {
+                this.shipVisual.visible = true;
+                this.shipVisual.rotation.z = 0;
+            }
+            if (this.tacticalMarker) {
+                this.tacticalMarker.visible = true;
+                const time = this.clock.getElapsedTime();
+                this.tacticalMarker.rotation.z = time * 0.5;
+            }
+        } else if (currentMode.isCockpit) {
+            // 1. KİŞİ KOKPİT GÖRÜNÜMÜ (Engelsiz berrak pilot görüşü)
+            const offset = currentMode.offset.clone().applyQuaternion(this.ship.quaternion);
+            this.camera.position.copy(this.ship.position).add(offset);
+
             const shipUp = new THREE.Vector3(0, 1, 0).applyQuaternion(this.ship.quaternion);
             this.camera.up.copy(shipUp);
-            this.camera.lookAt(targetLookPos);
-            this.cameraSnapNeeded = false;
-            return;
+
+            const lookOffset = currentMode.lookAt.clone().applyQuaternion(this.ship.quaternion);
+            this.camera.lookAt(this.ship.position.clone().add(lookOffset));
+
+            if (this.shipVisual) {
+                this.shipVisual.visible = false;
+            }
+            if (this.tacticalMarker) {
+                this.tacticalMarker.visible = false;
+            }
+        } else {
+            // 3. ŞAHIS UZAY GEMİSİ TAKİP (Sıfır Titreme, Sıfır Sallantı - Kaya gibi stabil)
+            const offset = currentMode.offset.clone().applyQuaternion(this.ship.quaternion);
+            this.camera.position.copy(this.ship.position).add(offset);
+
+            const shipUp = new THREE.Vector3(0, 1, 0).applyQuaternion(this.ship.quaternion);
+            this.camera.up.copy(shipUp);
+
+            const lookOffset = currentMode.lookAt.clone().applyQuaternion(this.ship.quaternion);
+            this.camera.lookAt(this.ship.position.clone().add(lookOffset));
+
+            if (this.shipVisual) {
+                this.shipVisual.visible = true;
+            }
+            if (this.tacticalMarker) {
+                this.tacticalMarker.visible = false;
+            }
         }
+    }
 
-        const posLerp = Math.min(1.0, dt * currentMode.followSpeed);
-        this.camera.position.lerp(targetCamPos, posLerp);
-
-        const shipUp = new THREE.Vector3(0, 1, 0).applyQuaternion(this.ship.quaternion);
-        this.camera.up.lerp(shipUp, Math.min(1.0, dt * 10.0));
-        this.camera.lookAt(targetLookPos);
-
-        if (this.shipVisual) {
-            this.shipVisual.visible = !currentMode.isCockpit;
+    setCameraMode(modeId) {
+        const idx = this.cameraModes.findIndex(m => m.id === modeId);
+        if (idx !== -1) {
+            this.currentCameraModeIndex = idx;
+            this.updateCameraUI();
         }
     }
 
     toggleCameraMode() {
         this.currentCameraModeIndex = (this.currentCameraModeIndex + 1) % this.cameraModes.length;
+        this.updateCameraUI();
+    }
+
+    updateCameraUI() {
         const currentMode = this.cameraModes[this.currentCameraModeIndex];
-        const btn = document.getElementById('btn-toggle-camera');
-        if (btn) {
-            btn.textContent = `🎥 Kamera: ${currentMode.shortName} (C)`;
+        document.querySelectorAll('.cam-mode-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.getAttribute('data-mode') === currentMode.id);
+        });
+
+        // Show "Gemime Odaklan" recenter button when in High System mode
+        const recenterBtn = document.getElementById('btn-recenter-system');
+        if (recenterBtn) {
+            recenterBtn.classList.toggle('hidden', currentMode.id !== 'system_high');
         }
     }
 
@@ -701,6 +769,24 @@ class CosmosSimulator {
         return group;
     }
 
+    showSystemLoading(galaxyName, systemName) {
+        const overlay = document.getElementById('system-loading-overlay');
+        const sub = document.getElementById('loading-system-name');
+        if (sub) {
+            sub.textContent = `${galaxyName} • ${systemName}`;
+        }
+        if (overlay) {
+            overlay.classList.remove('hidden');
+        }
+    }
+
+    hideSystemLoading() {
+        const overlay = document.getElementById('system-loading-overlay');
+        if (overlay) {
+            overlay.classList.add('hidden');
+        }
+    }
+
     // ========================================================================
     // STAR SYSTEM BUILDER (STARS, PLANETS, MOONS, RINGS, ASTEROID BELTS)
     // ========================================================================
@@ -708,10 +794,13 @@ class CosmosSimulator {
         const galaxy = window.SPACE_DATA.galaxies.find(g => g.id === galaxyId) || window.SPACE_DATA.galaxies[0];
         const system = galaxy.systems.find(s => s.id === systemId) || galaxy.systems[0];
 
+        this.showSystemLoading(galaxy.name, system.name);
+
         this.currentGalaxy = galaxy;
         this.currentSystem = system;
         this.lockedOrbitTarget = null;
         this.autopilotActive = false;
+        this.highSystemPan.set(0, 0); // Reset pan when switching systems
 
         // Clear previous system objects
         while (this.systemGroup.children.length > 0) {
@@ -760,24 +849,35 @@ class CosmosSimulator {
             planetEntry.moons.forEach(m => this.celestialObjects.push(m));
         });
 
-        // Position spacecraft near Earth (if Solar System) or 3rd/1st planet
+        // Position spacecraft near Earth (if Solar System) or 3rd/1st planet, elevated above equator for wide 3D panoramic perspective
         const defaultPlanet = this.planetEntries.find(p => p.data.id === 'earth') || this.planetEntries[0];
         if (defaultPlanet) {
             this.updateSystemOrbits(0);
             const wp = new THREE.Vector3();
             defaultPlanet.root.getWorldPosition(wp);
             const r = defaultPlanet.data.radius;
-            this.camera.position.set(wp.x + r * 4.2, wp.y + r * 1.4, wp.z + r * 4.2);
-            this.camera.lookAt(wp);
+            if (this.ship) {
+                this.ship.position.set(wp.x + r * 3.8, wp.y + r * 2.2, wp.z + r * 3.8);
+                this.ship.lookAt(wp);
+            }
             this.selectTarget(defaultPlanet);
         } else {
-            this.camera.position.set(0, 6000, 35000);
-            this.camera.lookAt(0, 0, 0);
+            if (this.ship) {
+                this.ship.position.set(0, 7500, 42000);
+                this.ship.lookAt(0, 0, 0);
+            }
         }
 
         this.velocity.set(0, 0, 0);
         this.angularVelocity.set(0, 0, 0);
+        this.cameraSnapNeeded = true;
+        this.updateCamera(0.016);
         this.refreshHUDSystemInfo();
+
+        // Smoothly dismiss loading overlay
+        setTimeout(() => {
+            this.hideSystemLoading();
+        }, isInitial ? 900 : 500);
     }
 
     createStarObject(starData) {
@@ -1139,8 +1239,9 @@ class CosmosSimulator {
                 moon.mesh.rotation.y += 0.05 * dt;
             });
 
-            // PROGRESSIVE LOD CALCULATION BASED ON CAMERA DISTANCE
-            const dist = camPos.distanceTo(planet.root.position);
+            // PROGRESSIVE LOD CALCULATION BASED ON DISTANCE TO SPACECRAFT
+            const focusPos = this.ship ? this.ship.position : this.camera.position;
+            const dist = focusPos.distanceTo(planet.root.position);
             const surfaceDist = Math.max(1, dist - planet.data.radius);
             const ratio = surfaceDist / planet.data.radius;
 
@@ -1181,7 +1282,11 @@ class CosmosSimulator {
         if (this.lockedOrbitTarget) {
             this.lockedOrbitTarget.root.getWorldPosition(this.tmpVec1);
             const deltaMove = this.tmpVec1.clone().sub(this.lastLockedWorldPos);
-            this.camera.position.add(deltaMove);
+            if (this.ship) {
+                this.ship.position.add(deltaMove);
+            } else {
+                this.camera.position.add(deltaMove);
+            }
             this.lastLockedWorldPos.copy(this.tmpVec1);
         }
     }
@@ -1194,6 +1299,8 @@ class CosmosSimulator {
             this.keys[e.code] = true;
             if (e.code === 'KeyO') this.toggleOrbits();
             if (e.code === 'KeyM') this.toggleGalaxyModal();
+            if (e.code === 'KeyC') this.toggleCameraMode();
+            if (e.code === 'KeyH') this.toggleMasterHUD();
             if (e.code === 'Digit1') this.setDriveMode(0.2);
             if (e.code === 'Digit2') this.setDriveMode(1.0);
             if (e.code === 'Digit3') this.setDriveMode(4.0);
@@ -1241,36 +1348,113 @@ class CosmosSimulator {
             this.lastMouse.x = e.clientX;
             this.lastMouse.y = e.clientY;
 
+            const currentMode = this.cameraModes[this.currentCameraModeIndex];
+            if (currentMode && currentMode.isHighSystem && !this.isPointerLocked) {
+                // High System Pan: Drag across entire solar system
+                const panFactor = this.highSystemAltitude * 0.0019;
+                this.highSystemPan.x -= dx * panFactor;
+                this.highSystemPan.y -= dy * panFactor;
+                return;
+            }
+
             const sensitivity = 0.0022;
+            this.lastYawRate = -dx * sensitivity;
             this.rotateShipLocal(-dy * sensitivity, -dx * sensitivity, 0);
         });
 
-        // Mouse wheel adjusts fine speed factor
+        // Mouse wheel adjusts zoom in High System, or fine cruise speed in ship follow
         this.canvas.addEventListener('wheel', (e) => {
             e.preventDefault();
+            const currentMode = this.cameraModes[this.currentCameraModeIndex];
+            if (currentMode && currentMode.isHighSystem) {
+                const zoomFactor = e.deltaY < 0 ? 0.88 : 1.14;
+                this.highSystemAltitude = Math.max(18000, Math.min(520000, this.highSystemAltitude * zoomFactor));
+                return;
+            }
             const delta = e.deltaY < 0 ? 1.15 : 0.87;
             this.fineSpeedFactor = Math.max(0.1, Math.min(10.0, this.fineSpeedFactor * delta));
         }, { passive: false });
+
+        // Touch Drag & Pinch Support (Mobile & Tablet Solar System Exploration)
+        let lastTouchDist = 0;
+        let lastTouchCenter = { x: 0, y: 0 };
+
+        this.canvas.addEventListener('touchstart', (e) => {
+            if (e.touches.length === 1) {
+                lastTouchCenter.x = e.touches[0].clientX;
+                lastTouchCenter.y = e.touches[0].clientY;
+            } else if (e.touches.length === 2) {
+                const dx = e.touches[0].clientX - e.touches[1].clientX;
+                const dy = e.touches[0].clientY - e.touches[1].clientY;
+                lastTouchDist = Math.hypot(dx, dy);
+            }
+        }, { passive: false });
+
+        this.canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault(); // Prevent page scroll during 3D cosmos flight
+            const currentMode = this.cameraModes[this.currentCameraModeIndex];
+
+            if (e.touches.length === 1) {
+                const tx = e.touches[0].clientX;
+                const ty = e.touches[0].clientY;
+                const dx = tx - lastTouchCenter.x;
+                const dy = ty - lastTouchCenter.y;
+                lastTouchCenter.x = tx;
+                lastTouchCenter.y = ty;
+
+                if (currentMode && currentMode.isHighSystem) {
+                    const panFactor = this.highSystemAltitude * 0.0022;
+                    this.highSystemPan.x -= dx * panFactor;
+                    this.highSystemPan.y -= dy * panFactor;
+                } else {
+                    const sens = 0.0035;
+                    this.rotateShipLocal(-dy * sens, -dx * sens, 0);
+                }
+            } else if (e.touches.length === 2) {
+                const dx = e.touches[0].clientX - e.touches[1].clientX;
+                const dy = e.touches[0].clientY - e.touches[1].clientY;
+                const dist = Math.hypot(dx, dy);
+
+                if (lastTouchDist > 0 && Math.abs(dist - lastTouchDist) > 1) {
+                    const pinchRatio = lastTouchDist / dist;
+                    if (currentMode && currentMode.isHighSystem) {
+                        this.highSystemAltitude = Math.max(18000, Math.min(520000, this.highSystemAltitude * pinchRatio));
+                    }
+                }
+                lastTouchDist = dist;
+            }
+        }, { passive: false });
+
+        this.canvas.addEventListener('touchend', (e) => {
+            if (e.touches.length < 2) lastTouchDist = 0;
+            if (e.touches.length === 1) {
+                lastTouchCenter.x = e.touches[0].clientX;
+                lastTouchCenter.y = e.touches[0].clientY;
+            }
+        });
     }
 
     // Quaternion local rotation guarantees full 360° pitch, yaw, and roll with zero gimbal lock!
     rotateShipLocal(pitchDelta, yawDelta, rollDelta) {
+        if (!this.ship) return;
         if (pitchDelta !== 0) {
             this.tmpQuat.setFromAxisAngle(new THREE.Vector3(1, 0, 0), pitchDelta);
-            this.camera.quaternion.multiply(this.tmpQuat);
+            this.ship.quaternion.multiply(this.tmpQuat);
         }
         if (yawDelta !== 0) {
             this.tmpQuat.setFromAxisAngle(new THREE.Vector3(0, 1, 0), yawDelta);
-            this.camera.quaternion.multiply(this.tmpQuat);
+            this.ship.quaternion.multiply(this.tmpQuat);
         }
         if (rollDelta !== 0) {
             this.tmpQuat.setFromAxisAngle(new THREE.Vector3(0, 0, 1), rollDelta);
-            this.camera.quaternion.multiply(this.tmpQuat);
+            this.ship.quaternion.multiply(this.tmpQuat);
         }
-        this.camera.quaternion.normalize();
+        this.ship.quaternion.normalize();
     }
 
     updateFlightPhysics(dt) {
+        if (!this.ship) return;
+
         // 1. Roll controls (Q / E) for 360° axial roll
         let rollInput = 0;
         if (this.keys['KeyQ']) rollInput += 1.4;
@@ -1304,7 +1488,7 @@ class CosmosSimulator {
         if (this.autopilotActive && this.selectedTarget) {
             // AUTOPILOT NAVIGATION TOWARD TARGET
             this.selectedTarget.root.getWorldPosition(this.tmpVec1);
-            const toTarget = this.tmpVec1.clone().sub(this.camera.position);
+            const toTarget = this.tmpVec1.clone().sub(this.ship.position);
             const dist = toTarget.length();
             const safeStopDist = this.selectedTarget.data.radius * 2.8;
 
@@ -1316,9 +1500,9 @@ class CosmosSimulator {
                 this.updateAutopilotButtonUI();
             } else {
                 // Smoothly rotate ship to face the target
-                const lookMat = new THREE.Matrix4().lookAt(this.camera.position, this.tmpVec1, this.camera.up);
+                const lookMat = new THREE.Matrix4().lookAt(this.ship.position, this.tmpVec1, this.ship.up);
                 this.tmpQuat.setFromRotationMatrix(lookMat);
-                this.camera.quaternion.slerp(this.tmpQuat, Math.min(1.0, dt * 3.5));
+                this.ship.quaternion.slerp(this.tmpQuat, Math.min(1.0, dt * 3.5));
 
                 // Smooth deceleration as we enter close approach (last 10 seconds of flight)
                 const approachSlowdown = Math.min(1.0, (dist - safeStopDist) / (targetMaxSpeed * 4.5));
@@ -1328,9 +1512,9 @@ class CosmosSimulator {
             }
         } else {
             // MANUAL 6-DOF SPACECRAFT THRUST
-            const forwardDir = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
-            const rightDir = new THREE.Vector3(1, 0, 0).applyQuaternion(this.camera.quaternion);
-            const upDir = new THREE.Vector3(0, 1, 0).applyQuaternion(this.camera.quaternion);
+            const forwardDir = new THREE.Vector3(0, 0, -1).applyQuaternion(this.ship.quaternion);
+            const rightDir = new THREE.Vector3(1, 0, 0).applyQuaternion(this.ship.quaternion);
+            const upDir = new THREE.Vector3(0, 1, 0).applyQuaternion(this.ship.quaternion);
 
             const desiredVel = new THREE.Vector3();
             desiredVel.addScaledVector(forwardDir, forwardInput * targetMaxSpeed);
@@ -1345,17 +1529,32 @@ class CosmosSimulator {
             }
         }
 
+        // Apply Velocity to Spaceship Position
+        this.ship.position.addScaledVector(this.velocity, dt);
+
         // Prevent flying inside solid planetary/stellar cores
-        this.camera.position.addScaledVector(this.velocity, dt);
         this.celestialObjects.forEach(obj => {
             obj.root.getWorldPosition(this.tmpVec2);
-            const d = this.camera.position.distanceTo(this.tmpVec2);
+            const d = this.ship.position.distanceTo(this.tmpVec2);
             const minSurface = obj.data.radius * 1.12;
             if (d < minSurface) {
-                const pushOut = this.camera.position.clone().sub(this.tmpVec2).normalize().multiplyScalar(minSurface);
-                this.camera.position.copy(this.tmpVec2).add(pushOut);
+                const pushOut = this.ship.position.clone().sub(this.tmpVec2).normalize().multiplyScalar(minSurface);
+                this.ship.position.copy(this.tmpVec2).add(pushOut);
             }
         });
+
+        // Smooth visual banking roll only on strafe inputs (A / D)
+        const strafeRoll = rightInput * -0.22;
+        const targetBank = THREE.MathUtils.clamp(strafeRoll, -0.35, 0.35);
+        this.currentBankRoll = (this.currentBankRoll || 0) + (targetBank - (this.currentBankRoll || 0)) * Math.min(1.0, dt * 5.0);
+        if (this.shipVisual && !this.cameraModes[this.currentCameraModeIndex].isCockpit) {
+            this.shipVisual.rotation.z = this.currentBankRoll;
+        }
+
+        // Animate engine plasma exhaust & trails
+        this.animateThrusters(dt, forwardInput, shiftBoost);
+        const isMovingForward = (forwardInput > 0 || this.autopilotActive || this.velocity.length() > 30);
+        this.updateEngineTrails(dt, isMovingForward);
     }
 
     // ========================================================================
@@ -1400,6 +1599,15 @@ class CosmosSimulator {
             document.getElementById('main-menu').classList.remove('hidden');
         });
 
+        // Direct Camera Mode Buttons (Cockpit / 3rd Person / High Solar System)
+        document.querySelectorAll('.cam-mode-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const mode = btn.getAttribute('data-mode');
+                this.setCameraMode(mode);
+            });
+        });
+        this.updateCameraUI();
+
         // Toggle Orbits
         document.getElementById('btn-toggle-orbits').addEventListener('click', () => this.toggleOrbits());
 
@@ -1439,7 +1647,97 @@ class CosmosSimulator {
             });
         }
 
+        // Panel Collapsing & Mobile Zen Mode Exploration (Easy Close & Open)
+        const navPanel = document.getElementById('hud-nav-sidebar');
+        const inspectorPanel = document.getElementById('hud-inspector-sidebar');
+        const dashboardPanel = document.getElementById('hud-flight-dashboard');
+
+        const pillNav = document.getElementById('btn-open-nav');
+        const pillInspector = document.getElementById('btn-open-inspector');
+        const pillDashboard = document.getElementById('btn-open-dashboard');
+
+        // Close buttons on panels
+        const btnCloseNav = document.getElementById('btn-close-nav');
+        if (btnCloseNav && navPanel) {
+            btnCloseNav.addEventListener('click', () => {
+                navPanel.classList.add('collapsed');
+                if (pillNav) pillNav.classList.remove('hidden');
+            });
+        }
+        if (pillNav && navPanel) {
+            pillNav.addEventListener('click', () => {
+                navPanel.classList.remove('collapsed');
+                pillNav.classList.add('hidden');
+            });
+        }
+
+        const btnCloseInspector = document.getElementById('btn-close-inspector');
+        if (btnCloseInspector && inspectorPanel) {
+            btnCloseInspector.addEventListener('click', () => {
+                inspectorPanel.classList.add('collapsed');
+                if (pillInspector) pillInspector.classList.remove('hidden');
+            });
+        }
+        if (pillInspector && inspectorPanel) {
+            pillInspector.addEventListener('click', () => {
+                inspectorPanel.classList.remove('collapsed');
+                pillInspector.classList.add('hidden');
+            });
+        }
+
+        const btnCloseDashboard = document.getElementById('btn-close-dashboard');
+        if (btnCloseDashboard && dashboardPanel) {
+            btnCloseDashboard.addEventListener('click', () => {
+                dashboardPanel.classList.add('collapsed');
+                if (pillDashboard) pillDashboard.classList.remove('hidden');
+            });
+        }
+        if (pillDashboard && dashboardPanel) {
+            pillDashboard.addEventListener('click', () => {
+                dashboardPanel.classList.remove('collapsed');
+                pillDashboard.classList.add('hidden');
+            });
+        }
+
+        // Master HUD Toggle (Clean Screen Zen Mode)
+        const btnToggleHud = document.getElementById('btn-toggle-hud');
+        if (btnToggleHud) {
+            btnToggleHud.addEventListener('click', () => this.toggleMasterHUD());
+        }
+        const btnRestoreHud = document.getElementById('btn-restore-hud');
+        if (btnRestoreHud) {
+            btnRestoreHud.addEventListener('click', () => this.toggleMasterHUD(false));
+        }
+
+        // Recenter High System Pan
+        const btnRecenter = document.getElementById('btn-recenter-system');
+        if (btnRecenter) {
+            btnRecenter.addEventListener('click', () => {
+                this.highSystemPan.set(0, 0);
+            });
+        }
+
+        // Auto-collapse side panels on small screens (phones/tablets <= 900px) so the solar system is clean to view
+        if (window.innerWidth <= 900) {
+            if (navPanel) navPanel.classList.add('collapsed');
+            if (pillNav) pillNav.classList.remove('hidden');
+            if (inspectorPanel) inspectorPanel.classList.add('collapsed');
+            if (pillInspector) pillInspector.classList.remove('hidden');
+        }
+
         this.buildGalaxyModalContent();
+    }
+
+    toggleMasterHUD(forceState) {
+        const hudLayer = document.getElementById('hud-ui-layer');
+        const pillRestore = document.getElementById('btn-restore-hud');
+        if (!hudLayer) return;
+
+        this.isHUDHidden = typeof forceState === 'boolean' ? forceState : !this.isHUDHidden;
+        hudLayer.classList.toggle('all-hud-hidden', this.isHUDHidden);
+        if (pillRestore) {
+            pillRestore.classList.toggle('hidden', !this.isHUDHidden);
+        }
     }
 
     setDriveMode(multiplier) {
@@ -1591,13 +1889,14 @@ class CosmosSimulator {
     }
 
     updateHUDTelemetry() {
-        const camPos = this.camera.position;
+        const shipPos = this.ship ? this.ship.position : this.camera.position;
+        const shipQuat = this.ship ? this.ship.quaternion : this.camera.quaternion;
 
         // 1. Update Coordinates & 360° Attitude Angles
         document.getElementById('hud-coords').textContent =
-            `X: ${(camPos.x / 1000).toFixed(1)}k  Y: ${(camPos.y / 1000).toFixed(1)}k  Z: ${(camPos.z / 1000).toFixed(1)}k`;
+            `X: ${(shipPos.x / 1000).toFixed(1)}k  Y: ${(shipPos.y / 1000).toFixed(1)}k  Z: ${(shipPos.z / 1000).toFixed(1)}k`;
 
-        this.eulerOrder.setFromQuaternion(this.camera.quaternion, 'YXZ');
+        this.eulerOrder.setFromQuaternion(shipQuat, 'YXZ');
         const yawDeg = ((THREE.MathUtils.radToDeg(-this.eulerOrder.y) % 360) + 360) % 360;
         const pitchDeg = THREE.MathUtils.radToDeg(this.eulerOrder.x);
         const rollDeg = THREE.MathUtils.radToDeg(this.eulerOrder.z);
@@ -1609,7 +1908,7 @@ class CosmosSimulator {
         // 2. Update Distances in Left Navigation List
         this.celestialObjects.forEach(obj => {
             obj.root.getWorldPosition(this.tmpVec1);
-            const dist = Math.max(0, camPos.distanceTo(this.tmpVec1) - obj.data.radius);
+            const dist = Math.max(0, shipPos.distanceTo(this.tmpVec1) - obj.data.radius);
             const label = document.getElementById(`dist-label-${obj.data.id}`);
             if (label) {
                 label.textContent = dist > 10000
@@ -1628,7 +1927,7 @@ class CosmosSimulator {
 
         if (this.selectedTarget) {
             this.selectedTarget.root.getWorldPosition(this.tmpVec1);
-            const rawDist = camPos.distanceTo(this.tmpVec1);
+            const rawDist = shipPos.distanceTo(this.tmpVec1);
             const surfDist = Math.max(0, rawDist - this.selectedTarget.data.radius);
 
             document.getElementById('target-live-dist').textContent = `${Math.round(surfDist).toLocaleString('tr-TR')} birim`;
@@ -1669,11 +1968,13 @@ class CosmosSimulator {
 
         const dt = Math.min(this.clock.getDelta(), 0.1);
 
+        this.updateSystemOrbits(dt);
+        this.updateFlightPhysics(dt);
+        this.updateCamera(dt);
+
         // Keep deep-space background centered on camera so stars are infinitely distant
         this.backgroundGroup.position.copy(this.camera.position);
 
-        this.updateSystemOrbits(dt);
-        this.updateFlightPhysics(dt);
         this.updateHUDTelemetry();
 
         this.renderer.render(this.scene, this.camera);

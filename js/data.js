@@ -5,7 +5,7 @@
 // Neighboring inner planets are ~18,000 - 24,000 units apart.
 // At Default Cruise Speed (360 u/s), flying between neighboring planets takes ~55-65 seconds (~1 minute).
 
-window.APP_VERSION = "v1.1.0 - 2026-10-19 23:15";
+window.APP_VERSION = "v1.3.0 - 2026-10-19 23:51";
 
 window.SPACE_DATA = {
     cruiseSpeedDefault: 360, // ~60 seconds for 21,600 units interplanetary flight

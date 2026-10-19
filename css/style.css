@@ -909,3 +909,245 @@ html, body {
         width: calc(220px * var(--ui-scale));
     }
 }
+
+/* ==================== SYSTEM LOADING OVERLAY ==================== */
+.system-loading-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 250;
+    background: radial-gradient(circle at center, rgba(3, 11, 28, 0.94) 0%, rgba(1, 2, 8, 0.98) 100%);
+    backdrop-filter: blur(12px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.4s ease, visibility 0.4s ease;
+}
+
+.system-loading-overlay.hidden {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+}
+
+.loading-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: calc(26px * var(--ui-scale));
+    border-radius: calc(16px * var(--ui-scale));
+    background: rgba(10, 25, 47, 0.7);
+    border: 1px solid rgba(0, 229, 255, 0.35);
+    box-shadow: 0 0 50px rgba(0, 229, 255, 0.25);
+    max-width: 90vw;
+}
+
+.loading-spinner-ring {
+    width: calc(52px * var(--ui-scale));
+    height: calc(52px * var(--ui-scale));
+    border: 3px solid rgba(0, 229, 255, 0.15);
+    border-top-color: var(--primary);
+    border-right-color: var(--accent);
+    border-radius: 50%;
+    animation: spinRing 0.9s linear infinite;
+    margin-bottom: calc(16px * var(--ui-scale));
+}
+
+@keyframes spinRing {
+    to { transform: rotate(360deg); }
+}
+
+.loading-title {
+    font-family: var(--font-display);
+    font-size: calc(17px * var(--ui-scale));
+    color: #fff;
+    font-weight: 700;
+    letter-spacing: 1px;
+    margin-bottom: calc(6px * var(--ui-scale));
+}
+
+.loading-subtitle {
+    font-size: calc(13px * var(--ui-scale));
+    color: var(--primary);
+    margin-bottom: calc(14px * var(--ui-scale));
+}
+
+.loading-progress-bar {
+    width: calc(260px * var(--ui-scale));
+    height: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 999px;
+    overflow: hidden;
+    margin-bottom: calc(10px * var(--ui-scale));
+}
+
+.loading-progress-fill {
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, var(--primary), #80d8ff, var(--accent));
+    animation: loadingBarMove 1.4s ease-in-out infinite;
+}
+
+@keyframes loadingBarMove {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+.loading-hint {
+    font-size: calc(11px * var(--ui-scale));
+    color: var(--text-muted);
+}
+
+/* ==================== COLLAPSIBLE PANELS & FLOATING TRIGGER PILLS ==================== */
+.panel-close-btn {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: var(--text-muted);
+    border-radius: 6px;
+    width: calc(24px * var(--ui-scale));
+    height: calc(24px * var(--ui-scale));
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: calc(11px * var(--ui-scale));
+    cursor: pointer;
+    transition: all 0.2s ease;
+    padding: 0;
+}
+
+.panel-close-btn:hover {
+    background: rgba(255, 75, 75, 0.25);
+    border-color: #ff5252;
+    color: #fff;
+}
+
+.nav-sidebar, .inspector-sidebar, .flight-dashboard {
+    transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.3s ease;
+}
+
+.nav-sidebar.collapsed {
+    transform: translateX(calc(-100% - 30px));
+    opacity: 0;
+    pointer-events: none;
+}
+
+.inspector-sidebar.collapsed {
+    transform: translateX(calc(100% + 30px));
+    opacity: 0;
+    pointer-events: none;
+}
+
+.flight-dashboard.collapsed {
+    transform: translateY(calc(100% + 30px));
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* Master HUD Hidden Mode */
+.ui-layer.all-hud-hidden .hud-top,
+.ui-layer.all-hud-hidden .hud-middle,
+.ui-layer.all-hud-hidden .hud-bottom,
+.ui-layer.all-hud-hidden .cockpit-center,
+.ui-layer.all-hud-hidden #pointer-lock-hint,
+.ui-layer.all-hud-hidden .hud-floating-pill:not(.restore-pill-btn) {
+    opacity: 0 !important;
+    pointer-events: none !important;
+    visibility: hidden !important;
+}
+
+/* Floating Pills to restore panels */
+.hud-floating-pill {
+    position: absolute;
+    background: var(--bg-panel);
+    border: 1px solid var(--border-light);
+    color: var(--text-main);
+    padding: calc(8px * var(--ui-scale)) calc(14px * var(--ui-scale));
+    border-radius: 999px;
+    font-family: var(--font-display);
+    font-size: calc(11px * var(--ui-scale));
+    letter-spacing: 0.8px;
+    cursor: pointer;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+    transition: all 0.2s ease;
+    z-index: 25;
+    white-space: nowrap;
+}
+
+.hud-floating-pill:hover {
+    border-color: var(--primary);
+    background: rgba(0, 229, 255, 0.2);
+    box-shadow: 0 0 15px var(--primary-glow);
+}
+
+.nav-pill-btn {
+    left: calc(16px * var(--ui-scale));
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+.inspector-pill-btn {
+    right: calc(16px * var(--ui-scale));
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+.dashboard-pill-btn {
+    bottom: calc(16px * var(--ui-scale));
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+.restore-pill-btn {
+    top: calc(16px * var(--ui-scale));
+    right: calc(16px * var(--ui-scale));
+    background: rgba(0, 229, 255, 0.25);
+    border-color: var(--primary);
+    color: #fff;
+    font-weight: 700;
+}
+
+.recenter-system-btn {
+    top: calc(75px * var(--ui-scale));
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 229, 255, 0.2);
+    border-color: var(--primary);
+    color: var(--primary);
+    font-weight: 700;
+}
+
+.recenter-system-btn:hover {
+    background: var(--primary);
+    color: #000;
+}
+
+/* Mobile & Tablet Optimizations */
+@media (max-width: 900px) {
+    .menu-content-grid {
+        grid-template-columns: 1fr;
+        max-height: 72vh;
+    }
+    .hud-middle {
+        margin: 4px 0;
+    }
+    .nav-sidebar {
+        width: min(85vw, 290px);
+        position: absolute;
+        left: 12px;
+        top: 60px;
+        z-index: 20;
+    }
+    .inspector-sidebar {
+        width: min(85vw, 290px);
+        position: absolute;
+        right: 12px;
+        top: 60px;
+        z-index: 20;
+    }
+    .flight-dashboard {
+        padding: 8px 12px;
+    }
+    .drive-modes {
+        grid-template-columns: 1fr 1fr;
+    }
+}

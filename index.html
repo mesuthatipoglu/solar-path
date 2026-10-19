@@ -27,6 +27,19 @@
         </div>
         <div id="pointer-lock-hint">360° Serbest Bakış: Fareyle Sürükleyin veya Ekrana Çift Tıklayın • C: Kamera Açısı (3. Şahıs)</div>
 
+        <!-- ==================== GALAXY / SYSTEM LOADING OVERLAY ==================== -->
+        <div id="system-loading-overlay" class="system-loading-overlay hidden">
+            <div class="loading-box">
+                <div class="loading-spinner-ring"></div>
+                <div class="loading-title">🌌 Galaksiler ve Yıldız Sistemleri Yükleniyor...</div>
+                <div id="loading-system-name" class="loading-subtitle">Samanyolu Galaksisi • Güneş Sistemi</div>
+                <div class="loading-progress-bar">
+                    <div class="loading-progress-fill"></div>
+                </div>
+                <div class="loading-hint">Gezegen dokuları, atmosfer ve 3B yörünge simülasyonu başlatılıyor</div>
+            </div>
+        </div>
+
         <!-- ==================== MAIN MENU OVERLAY ==================== -->
         <div id="main-menu" class="interactive">
             <div class="menu-header">
@@ -80,7 +93,7 @@
                             <span class="key-pill">FARE TEKERLEĞİ</span>
                         </div>
                         <div class="ctrl-row">
-                            <span>Kamera Açısı (3. Şahıs / Kokpit)</span>
+                            <span>Kamera (Kokpit / 3. Şahıs / Yüksek)</span>
                             <span class="key-pill">C</span>
                         </div>
                         <div class="ctrl-row">
@@ -89,8 +102,8 @@
                         </div>
                     </div>
                     <div style="font-size: calc(12px * var(--ui-scale)); color: var(--text-muted); line-height: 1.45; margin-top: auto; background: rgba(0, 229, 255, 0.06); padding: 10px; border-radius: 8px; border: 1px solid rgba(0,229,255,0.2);">
-                        <strong style="color: var(--primary);">🛰️ 3. Şahıs Yüksek Takip Kamerası:</strong><br>
-                        Gezegenleri yatay hizada kaybetmemeniz için kamera uzay geminizi <strong>yukarıdan ve belirli bir mesafeden</strong> 3. kişi gözüyle takip eder. Dilerseniz <strong>C</strong> tuşuyla kamera mesafesini veya kokpit modunu değiştirebilirsiniz.
+                        <strong style="color: var(--primary);">🛰️ 3 Farklı Kamera Modu (Sallantısız &amp; Stabil):</strong><br>
+                        <strong>1. Kişi Kokpit</strong>, <strong>3. Şahıs Takip</strong> veya <strong>Güneş Sisteminin Yarısını Gören Yüksek Bakış</strong> açıları arasında <strong>C</strong> tuşuyla veya üstteki butonlarla anında geçiş yapabilirsiniz.
                     </div>
                 </div>
             </div>
@@ -101,12 +114,12 @@
 
             <div class="menu-footer">
                 <div>WebGL Three.js 3D Fizik &amp; Prosedürel + NASA/Wikimedia Gezegen Dokuları</div>
-                <div id="app-version-display" class="version-tag">v1.1.0 - 2026-10-19 23:15</div>
+                <div id="app-version-display" class="version-tag">v1.3.0 - 2026-10-19 23:51</div>
             </div>
         </div>
 
         <!-- ==================== IN-GAME COCKPIT HUD ==================== -->
-        <div class="ui-layer">
+        <div class="ui-layer" id="hud-ui-layer">
             <!-- TOP HUD -->
             <div class="hud-top">
                 <div class="hud-panel location-panel interactive">
@@ -126,29 +139,35 @@
                 </div>
 
                 <div class="hud-actions interactive">
-                    <button id="btn-toggle-camera" class="hud-btn">🎥 Kamera: 3. Şahıs (C)</button>
-                    <button id="btn-open-galaxy-map" class="hud-btn">🌌 Galaksi &amp; Sistemler (M)</button>
-                    <button id="btn-toggle-orbits" class="hud-btn active">🪐 Yörünge Çizgileri (O)</button>
-                    <button id="btn-open-menu" class="hud-btn">⚙️ Ana Menü</button>
+                    <button id="btn-cam-cockpit" class="hud-btn cam-mode-btn" data-mode="cockpit" title="1. Kişi Kokpit Görünümü">🛸 1. Kişi</button>
+                    <button id="btn-cam-chase" class="hud-btn cam-mode-btn active" data-mode="chase" title="3. Şahıs Gemi Takip">🛰️ 3. Şahıs</button>
+                    <button id="btn-cam-high" class="hud-btn cam-mode-btn" data-mode="system_high" title="Güneş Sistemini Gezme (Kaydırılabilir Yüksek Bakış)">🌌 Yüksek Sistem</button>
+                    <button id="btn-toggle-hud" class="hud-btn" title="Arayüzü Gizle / Göster (H)">👁️ Arayüz (H)</button>
+                    <button id="btn-open-galaxy-map" class="hud-btn">🌌 Galaksi (M)</button>
+                    <button id="btn-toggle-orbits" class="hud-btn active">🪐 Yörüngeler (O)</button>
+                    <button id="btn-open-menu" class="hud-btn">⚙️ Menü</button>
                 </div>
             </div>
 
             <!-- MIDDLE HUD (LEFT: SYSTEM BODIES, RIGHT: TARGET TELEMETRY & LOD) -->
             <div class="hud-middle">
-                <div class="hud-panel nav-sidebar interactive">
+                <div class="hud-panel nav-sidebar interactive" id="hud-nav-sidebar">
                     <div class="sidebar-header">
                         <span>SİSTEM GÖK CİSİMLERİ</span>
-                        <span>MESAFE</span>
+                        <button id="btn-close-nav" class="panel-close-btn" title="Cisimler Listesini Gizle">✕</button>
                     </div>
                     <div id="hud-body-list" class="body-list">
                         <!-- Populated dynamically -->
                     </div>
                 </div>
 
-                <div class="hud-panel inspector-sidebar interactive">
+                <div class="hud-panel inspector-sidebar interactive" id="hud-inspector-sidebar">
                     <div class="target-title-row">
                         <div id="target-name" class="target-name">Dünya (Terra)</div>
-                        <span id="target-type" class="target-badge">Karasal Gezegen</span>
+                        <div style="display:flex; align-items:center; gap:6px;">
+                            <span id="target-type" class="target-badge">Karasal Gezegen</span>
+                            <button id="btn-close-inspector" class="panel-close-btn" title="Hedef Panelini Gizle">✕</button>
+                        </div>
                     </div>
                     <p id="target-desc" class="target-desc">
                         Gezegen açıklaması yükleniyor...
@@ -193,7 +212,8 @@
 
             <!-- BOTTOM HUD (FLIGHT SPEED, ~1 MIN CRUISE MODES & ORBIT TIME-SCALE) -->
             <div class="hud-bottom">
-                <div class="hud-panel flight-dashboard interactive">
+                <div class="hud-panel flight-dashboard interactive" id="hud-flight-dashboard">
+                    <button id="btn-close-dashboard" class="panel-close-btn" style="position:absolute; top:8px; right:8px;" title="Kontrol Panelini Gizle">✕</button>
                     <div class="speed-readout">
                         <span class="speed-label">Uzay Aracı Seyir Hızı</span>
                         <span id="hud-speed-val" class="speed-value">360 u/sn</span>
@@ -228,6 +248,13 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Floating Quick Restore Pills for Mobile & Clean Screen Exploration -->
+            <button id="btn-open-nav" class="hud-floating-pill nav-pill-btn hidden interactive">🪐 Gök Cisimleri</button>
+            <button id="btn-open-inspector" class="hud-floating-pill inspector-pill-btn hidden interactive">📡 Hedef Bilgisi</button>
+            <button id="btn-open-dashboard" class="hud-floating-pill dashboard-pill-btn hidden interactive">🚀 Hız &amp; Kontroller</button>
+            <button id="btn-restore-hud" class="hud-floating-pill restore-pill-btn hidden interactive">👁️ Arayüzü Göster</button>
+            <button id="btn-recenter-system" class="hud-floating-pill recenter-system-btn hidden interactive">🎯 Gemime Odaklan</button>
         </div>
 
         <!-- ==================== GALAXY & STAR SYSTEM WARP MODAL ==================== -->
